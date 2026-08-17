@@ -4,19 +4,25 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import immersive_aircraft.entity.bullet.TinyTNT;
 import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.block.BlockModelRenderState;
+import net.minecraft.client.renderer.block.BlockModelResolver;
+import net.minecraft.client.renderer.block.model.BlockDisplayContext;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.TntMinecartRenderer;
-import net.minecraft.client.renderer.entity.state.EntityRenderState;
-import net.minecraft.client.renderer.state.CameraRenderState;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.block.Blocks;
 import org.jetbrains.annotations.NotNull;
 
 public class TinyTNTRenderer extends EntityRenderer<TinyTNT, TinyTNTRenderState> {
+    private final BlockModelResolver blockModelResolver;
+    private final BlockModelRenderState blockRenderState = new BlockModelRenderState();
+
     public TinyTNTRenderer(EntityRendererProvider.Context context) {
         super(context);
         this.shadowRadius = 0.2f;
+        this.blockModelResolver = context.getBlockModelResolver();
     }
 
     @Override
@@ -48,7 +54,8 @@ public class TinyTNTRenderer extends EntityRenderer<TinyTNT, TinyTNTRenderState>
         matrixStack.mulPose(Axis.YP.rotationDegrees(-90.0f));
         matrixStack.translate(-0.5, -0.5, 0.5);
         matrixStack.mulPose(Axis.YP.rotationDegrees(90.0f));
-        TntMinecartRenderer.submitWhiteSolidBlock(Blocks.TNT.defaultBlockState(), matrixStack, collector, state.lightCoords, i / 5 % 2 == 0, state.outlineColor);
+        blockModelResolver.update(blockRenderState, Blocks.TNT.defaultBlockState(), BlockDisplayContext.create());
+        TntMinecartRenderer.submitWhiteSolidBlock(blockRenderState, matrixStack, collector, state.lightCoords, i / 5 % 2 == 0, state.outlineColor);
         matrixStack.popPose();
         super.submit(state, matrixStack, collector, cameraState);
     }

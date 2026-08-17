@@ -192,6 +192,11 @@ public class WarshipEntity extends AirshipEntity {
 
     @Override
     public double getZoom() {
-        return 5.0f + enginePower.getSmooth(Main.frameTime) * 5.0f;
+        return getZoom(Main.frameTime);
+    }
+
+    @Override
+    public double getZoom(float tickDelta) {
+        return 5.0f + enginePower.getSmooth(tickDelta) * 5.0f;
     }
 }

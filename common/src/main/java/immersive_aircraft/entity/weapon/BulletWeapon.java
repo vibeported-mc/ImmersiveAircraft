@@ -35,20 +35,15 @@ public abstract class BulletWeapon extends Weapon {
         return 1.0f;
     }
 
-    protected Vector4f getBarrelOffset() {
-        return new Vector4f(0.0f, 0.0f, 0.0f, 1.0f);
-    }
-
     protected int getBulletCount() {
         return 1;
     }
 
     public void fire(Vector3f direction) {
         // Calculate the position of the barrel
-        Vector4f position = getBarrelOffset();
         VehicleEntity entity = getEntity();
-        position.mul(getMount().transform());
-        position.mul(entity.getVehicleTransform());
+        Vec3 barrel = getBarrelPosition();
+        Vector4f position = new Vector4f((float) barrel.x, (float) barrel.y, (float) barrel.z, 1.0f);
 
         Vec3 speed = entity.getSpeedVector();
 
@@ -105,7 +100,7 @@ public abstract class BulletWeapon extends Weapon {
 
         if (ammo <= 0) {
             if (getEntity().getControllingPassenger() instanceof Player player) {
-                player.displayClientMessage(Component.translatable("immersive_aircraft.out_of_ammo"), true);
+                player.sendOverlayMessage(Component.translatable("immersive_aircraft.out_of_ammo"));
             }
             return false;
         }

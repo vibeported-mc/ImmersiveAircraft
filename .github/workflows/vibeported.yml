@@ -1,0 +1,66 @@
+# Build-only CI for the vibeported 26.2 branch.
+#
+# Deliberately NOT named gradle.yml: upstream's workflow of that name publishes to
+# Luke100000's Maven/Modrinth/CurseForge on every push, and this branch deletes it.
+# Nothing here publishes anywhere — it builds the installable jar and uploads it as
+# a run artifact, nothing more.
+#
+# Two independent gates keep this off every other branch:
+#   1. The file only exists on 26.2, and `push` resolves workflows from the pushed
+#      commit, so branches without this file cannot trigger it at all.
+#   2. The `branches:` filter below, which still holds if this branch is ever merged
+#      somewhere else and carries the file along with it.
+name: Build Fabric Jar (26.2)
+
+on:
+  push:
+    branches:
+      - '26.2-vibeported'
+
+# Build-only: no writes to the repo, no package publishing.
+permissions:
+  contents: read
+
+# Supersede an in-flight build when new commits land on the same ref.
+concurrency:
+  group: build-fabric-26.2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # The build declares a Java 25 toolchain and `options.release = 25`.
+      # setup-java points JAVA_HOME at 25, which Gradle then auto-detects as the toolchain.
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      # Caches the Gradle dependency cache and the Loom/Minecraft artifacts between runs.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # gradlew is committed mode 100755, so no chmod is needed.
+      # The daemon is already off via org.gradle.daemon=false in gradle.properties.
+      - name: Build Fabric jar
+        run: ./gradlew :fabric:build --stacktrace
+
+      - name: List built artifacts
+        run: ls -lh fabric/build/libs
+
+      # The runnable mod jar is the shadowJar output with the access widener injected.
+      # Version is resolved by the build, so match it with a glob and exclude sources.
+      - name: Upload installable jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: immersive-aircraft-fabric-26.2-${{ github.sha }}
+          path: |
+            fabric/build/libs/*.jar
+            !fabric/build/libs/*-sources.jar
+          if-no-files-found: error
+          retention-days: 30

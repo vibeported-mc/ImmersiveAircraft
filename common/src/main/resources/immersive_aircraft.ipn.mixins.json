@@ -1,0 +1,13 @@
+{
+  "required": false,
+  "minVersion": "0.7",
+  "package": "immersive_aircraft.compat.ipn.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "plugin": "immersive_aircraft.compat.ipn.IPNMixinPlugin",
+  "client": [
+    "AreaTypesMixin", "SlotIntegrationHintsMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

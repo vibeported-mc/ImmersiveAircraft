@@ -1,9 +1,11 @@
 package immersive_aircraft.entity.weapon;
 
 import org.joml.Vector3f;
+import org.joml.Vector4f;
 import immersive_aircraft.entity.VehicleEntity;
 import immersive_aircraft.entity.misc.WeaponMount;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.Vec3;
 
 public abstract class Weapon {
     private final VehicleEntity entity;
@@ -41,6 +43,29 @@ public abstract class Weapon {
 
     public void setGunnerOffset(int gunnerOffset) {
         this.gunnerOffset = gunnerOffset;
+    }
+
+    protected Vector4f getBarrelOffset() {
+        return new Vector4f(0.0f, 0.0f, 0.0f, 1.0f);
+    }
+
+    /**
+     * World position the projectile leaves from, before the barrel length is applied.
+     */
+    public Vec3 getBarrelPosition() {
+        Vector4f position = getBarrelOffset();
+        position.mul(getMount().transform());
+        position.mul(getEntity().getVehicleTransform());
+        return new Vec3(position.x(), position.y(), position.z());
+    }
+
+    /**
+     * Whether shots should be aimed at whatever the gunner's reticle is on, instead of being fired along
+     * the barrel's own orientation. Only sensible for weapons whose aim actually follows the gunner;
+     * a fixed forward mount is supposed to shoot where the vehicle points, not where the pilot looks.
+     */
+    public boolean convergesOnReticle() {
+        return false;
     }
 
     public abstract void tick();

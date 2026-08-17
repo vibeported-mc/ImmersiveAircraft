@@ -18,6 +18,9 @@ public class HeavyCrossbow extends BulletWeapon {
     private static final float MAX_COOLDOWN = 1.0f;
     private float cooldown = 0.0f;
 
+    // Only used to resolve where the gunner's reticle is pointing; the mount itself is aimed elsewhere.
+    private final RotationalManager rotationalManager = new RotationalManager(this);
+
     private final float velocity;
     private final float inaccuracy;
 
@@ -56,7 +59,8 @@ public class HeavyCrossbow extends BulletWeapon {
         Arrow arrow = new Arrow(getEntity().level(), position.x(), position.y(), position.z(), ammo, null);
         arrow.pickup = AbstractArrow.Pickup.DISALLOWED;
         arrow.setOwner(getEntity().getControllingPassenger());
-        arrow.shoot(direction.x(), direction.y() + 0.1f, direction.z(), getVelocity(), getInaccuracy());
+        // No upward fudge: the direction now already points at the reticle, so biasing it throws shots high.
+        arrow.shoot(direction.x(), direction.y(), direction.z(), getVelocity(), getInaccuracy());
         return arrow;
     }
 
@@ -90,11 +94,22 @@ public class HeavyCrossbow extends BulletWeapon {
         }
     }
 
+    @Override
+    public boolean convergesOnReticle() {
+        return true;
+    }
+
     private Vector3f getDirection() {
-        Vector3f direction = new Vector3f(0, 0, 1.0f);
-        direction.mul(new Matrix3f(getMount().transform()));
-        direction.mul(getEntity().getVehicleNormalTransform());
-        return direction;
+        Vector3f direction = rotationalManager.aimFrom(getEntity(), getBarrelPosition());
+        if (direction != null) {
+            return direction;
+        }
+
+        // No gunner to aim for: fall back to firing along the mount.
+        Vector3f mountForward = new Vector3f(0, 0, 1.0f);
+        mountForward.mul(new Matrix3f(getMount().transform()));
+        mountForward.mul(getEntity().getVehicleNormalTransform());
+        return mountForward;
     }
 
     public float getCooldown() {

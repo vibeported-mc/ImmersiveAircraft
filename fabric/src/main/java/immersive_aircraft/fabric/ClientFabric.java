@@ -12,7 +12,7 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -44,7 +44,7 @@ public final class ClientFabric implements ClientModInitializer {
         Renderer.bootstrap();
         WeaponRendererRegistry.bootstrap();
 
-        KeyBindings.list.forEach(KeyBindingHelper::registerKeyBinding);
+        KeyBindings.list.forEach(KeyMappingHelper::registerKeyMapping);
         ItemTooltipCallback.EVENT.register(this::itemTooltipCallback);
     }
 

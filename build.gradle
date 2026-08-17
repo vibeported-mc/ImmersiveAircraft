@@ -5,8 +5,8 @@ buildscript {
 }
 
 plugins {
-    id "architectury-plugin" version "3.4-SNAPSHOT"
-    id "dev.architectury.loom" version "1.14-SNAPSHOT" apply false
+    id "architectury-plugin" version "3.5-SNAPSHOT"
+    id "dev.architectury.loom" version "1.17-SNAPSHOT" apply false
 }
 
 architectury {
@@ -31,14 +31,16 @@ subprojects {
         maven { url "https://maven.teamresourceful.com/repository/maven-public/" }
         maven { url "https://cursemaven.com" }
         maven { url "https://maven.conczin.net/Artifacts" }
+        maven {
+            url "https://api.modrinth.com/maven"
+            content { includeGroup "maven.modrinth" }
+        }
     }
 
     dependencies {
         minecraft "com.mojang:minecraft:${rootProject.architectury.minecraft}"
-        mappings loom.layered() {
-            officialMojangMappings()
-            parchment("org.parchmentmc.data:parchment-${rootProject.parchment_version}@zip")
-        }
+        // Minecraft 26.1+ ships unobfuscated with Mojang's official names baked in,
+        // so there is no obfuscation map to apply anymore (see fabric.loom.disableObfuscation in gradle.properties).
     }
 }
 
@@ -67,16 +69,19 @@ allprojects {
     apply plugin: "architectury-plugin"
     apply plugin: "maven-publish"
 
-    archivesBaseName = rootProject.archives_base_name
+    base.archivesName = rootProject.archives_base_name
     version = getAppVersion()
 
     tasks.withType(JavaCompile) {
         options.encoding = "UTF-8"
-        options.release = 21
+        options.release = 25
     }
 
     java {
         withSourcesJar()
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(25)
+        }
     }
 
     publishing {

@@ -66,8 +66,14 @@ public class RotaryCannon extends BulletWeapon {
         return Sounds.CANNON.get();
     }
 
+    @Override
+    public boolean convergesOnReticle() {
+        return true;
+    }
+
     private Vector3f getDirection() {
-        return rotationalManager.screenToGlobal(getEntity());
+        Vector3f direction = rotationalManager.aimFrom(getEntity(), getBarrelPosition());
+        return direction == null ? rotationalManager.screenToGlobal(getEntity()) : direction;
     }
 
     @Override

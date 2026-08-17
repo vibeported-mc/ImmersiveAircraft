@@ -1,5 +1,5 @@
 plugins {
-    id "com.github.johnrengelman.shadow" version "7.1.2"
+    id "com.gradleup.shadow" version "9.5.1"
 }
 
 architectury {
@@ -20,32 +20,35 @@ configurations {
 }
 
 dependencies {
-    modImplementation "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}"
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}"
+    implementation "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}"
 
+    // Shaded rather than jar-in-jar'd: Loom's JIJ step lived in remapJar, which unobfuscated builds no longer have.
     implementation 'org.mariuszgromada.math:MathParser.org-mXparser:5.2.1'
-    include 'org.mariuszgromada.math:MathParser.org-mXparser:5.2.1'
+    shadowCommon 'org.mariuszgromada.math:MathParser.org-mXparser:5.2.1'
 
-    modCompileOnly("com.terraformersmc:modmenu:${rootProject.mod_menu_version}") { transitive false }
+    compileOnly("com.terraformersmc:modmenu:${rootProject.mod_menu_version}") { transitive false }
 
-    modCompileOnlyApi("mezz.jei:jei-${minecraft_version}-fabric-api:${jei_version}")
+    compileOnlyApi("mezz.jei:jei-${minecraft_version}-fabric-api:${jei_version}")
 
-    modRuntimeOnly "me.shedaniel:RoughlyEnoughItems-api-fabric:$rei_version"
+    runtimeOnly "me.shedaniel:RoughlyEnoughItems-api-fabric:$rei_version"
 
     // Required to run JEI
-    modRuntimeOnly("mezz.jei:jei-${minecraft_version}-fabric:${jei_version}")
+    runtimeOnly("mezz.jei:jei-${minecraft_version}-fabric:${jei_version}")
 
     // Required to run REI
-    //modRuntimeOnly "dev.architectury:architectury-fabric:${rootProject.architectury_version}"
-    //modRuntimeOnly "me.shedaniel:RoughlyEnoughItems-fabric:$rei_version"
+    //runtimeOnly "dev.architectury:architectury-fabric:${rootProject.architectury_version}"
+    //runtimeOnly "me.shedaniel:RoughlyEnoughItems-fabric:$rei_version"
 
-    // modCompileOnly "earth.terrarium.adastra:ad_astra-fabric-${ad_astra_version}"
-    // modRuntimeOnly "earth.terrarium.adastra:ad_astra-fabric-${ad_astra_version}"
+    // compileOnly "earth.terrarium.adastra:ad_astra-fabric-${ad_astra_version}"
+    // runtimeOnly "earth.terrarium.adastra:ad_astra-fabric-${ad_astra_version}"
 
-    // modRuntimeOnly "net.conczin:man_of_many_planes:${man_of_many_planes_version}+fabric"
-    // modRuntimeOnly "net.conczin:immersive_machinery:${immersive_machinery}+fabric"
+    // runtimeOnly "net.conczin:man_of_many_planes:${man_of_many_planes_version}+fabric"
+    // runtimeOnly "net.conczin:immersive_machinery:${immersive_machinery}+fabric"
 
-    common(project(path: ":common", configuration: "namedElements")) { transitive false }
+    // Minecraft 26.1+ is unobfuscated, so there's no separate "namedElements" variant anymore;
+    // the project's default (api/runtime) variants are already in the official names.
+    common(project(":common")) { transitive false }
     shadowCommon(project(path: ":common", configuration: "transformProductionFabric")) { transitive false }
 }
 
@@ -61,13 +64,15 @@ shadowJar {
     exclude "architectury.common.json"
 
     configurations = [project.configurations.shadowCommon]
-    archiveClassifier = "dev-shadow"
+    archiveClassifier = ""
 }
 
-remapJar {
-    injectAccessWidener = true
-    input.set shadowJar.archiveFile
-    dependsOn shadowJar
+// Minecraft 26.1+ ships unobfuscated, so Loom no longer remaps jars (no "remapJar" task);
+// the shaded jar produced by shadowJar is the final artifact, we just need to inject the access widener into it.
+loom.injectAccessWidener(tasks.named("shadowJar"))
+
+tasks.named("assemble") {
+    dependsOn tasks.named("shadowJar")
 }
 
 sourcesJar {

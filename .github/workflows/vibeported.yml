@@ -1,34 +1,49 @@
-# Build-only CI for the vibeported 26.2 branch.
+# Build and release CI for the vibeported fork.
 #
 # Deliberately NOT named gradle.yml: upstream's workflow of that name publishes to
-# Luke100000's Maven/Modrinth/CurseForge on every push, and this branch deletes it.
-# Nothing here publishes anywhere — it builds the installable jar and uploads it as
-# a run artifact, nothing more.
+# Luke100000's Maven/Modrinth/CurseForge, and this fork deletes it. Nothing here
+# touches upstream — Maven goes to this repo's GitHub Packages, files go to this
+# repo's Releases page.
 #
-# Two independent gates keep this off every other branch:
-#   1. The file only exists on 26.2, and `push` resolves workflows from the pushed
-#      commit, so branches without this file cannot trigger it at all.
-#   2. The `branches:` filter below, which still holds if this branch is ever merged
-#      somewhere else and carries the file along with it.
-name: Build Fabric Jar (26.2)
+# Nothing here runs on a branch push. The build job is manual only (workflow_dispatch)
+# and the release job fires only on a pushed tag, so the sole automatic path into CI is
+# creating a release tag. Note this drops the old `branches:` filter, which no longer has
+# anything to gate: what keeps this off other branches is now simply that the file exists
+# on this one.
+name: Vibeported Build & Release
 
 on:
+  # Branch builds never start on their own — run them from the Actions tab, or with
+  # `gh workflow run vibeported.yml --ref <branch>`. This works because the workflow
+  # lives on the default branch; GitHub only offers the Run workflow button for
+  # workflows present there.
+  workflow_dispatch:
   push:
-    branches:
-      - '26.2-vibeported'
+    tags:
+      # GitHub filter patterns are globs, not regex, so the exact tag shape cannot be
+      # expressed here. Accept every tag and enforce the real format in the release job,
+      # which fails loudly on a malformed tag rather than quietly publishing the wrong
+      # coordinates. Format: <mod>-<minecraft>-fabric[-build.<n>]
+      #   1.4.7-26.2-fabric            1.4.7-26.2.1-fabric
+      #   1.4.7-26.2-fabric-build.3    1.4.7-26.2.1-fabric-build.12
+      - '*'
 
-# Build-only: no writes to the repo, no package publishing.
+# Least privilege by default; the release job widens this for itself only.
 permissions:
   contents: read
 
-# Supersede an in-flight build when new commits land on the same ref.
 concurrency:
-  group: build-fabric-26.2-${{ github.ref }}
+  group: vibeported-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # Manual runs: prove it compiles, keep a downloadable jar for 30 days.
   build:
+    name: Build (manual)
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -64,3 +79,81 @@ jobs:
             !fabric/build/libs/*-sources.jar
           if-no-files-found: error
           retention-days: 30
+
+  # Tag pushes: publish to GitHub Packages Maven and attach the jars to a Release.
+  release:
+    name: Release (tag)
+    # Both conditions matter: workflow_dispatch can be pointed at a tag ref, and a manual
+    # run must never publish or re-release. Only an actual tag push does that.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # create the release and upload its assets
+      packages: write   # publish to this repo's GitHub Packages Maven registry
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Tag format: <mod>-<minecraft>-fabric[-build.<n>]
+      # The mod part requires three components, Minecraft accepts two or three, and the
+      # build counter is optional. Dashes and dots only: `+` is avoided deliberately, since
+      # Gradle reads a trailing `+` as a dynamic-version wildcard and `+` in a repository
+      # URL path is widely mis-decoded as a space.
+      - name: Parse and validate tag
+        id: ver
+        run: |
+          tag="$GITHUB_REF_NAME"
+          re='^([0-9]+\.[0-9]+\.[0-9]+)-([0-9]+\.[0-9]+(\.[0-9]+)?)-fabric(-build\.([0-9]+))?$'
+          if [[ ! "$tag" =~ $re ]]; then
+            echo "::error::Tag '$tag' must be <mod>-<minecraft>-fabric[-build.<n>], e.g. 1.4.7-26.2-fabric, 1.4.7-26.2.1-fabric or 1.4.7-26.2-fabric-build.3"
+            exit 1
+          fi
+          mod="${BASH_REMATCH[1]}"
+          mc="${BASH_REMATCH[2]}"
+          build="${BASH_REMATCH[5]}"
+          title="Immersive Aircraft $mod for Minecraft $mc"
+          if [[ -n "$build" ]]; then
+            title="$title (build $build)"
+          fi
+          {
+            echo "mod=$mod"
+            echo "mc=$mc"
+            echo "build=$build"
+            echo "full=$tag"
+            echo "title=$title"
+          } >> "$GITHUB_OUTPUT"
+          echo "Publishing $tag -> $title"
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # MOD_VERSION overrides the version Gradle would otherwise derive from git, so the
+      # jar filenames and the Maven coordinates both carry the exact tag. `build` must run
+      # before `publish`: shadowJar writes the shaded jar over the thin one, and publish
+      # uploads whatever is on disk.
+      - name: Build and publish to GitHub Packages Maven
+        env:
+          MOD_VERSION: ${{ steps.ver.outputs.full }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./gradlew :fabric:build :fabric:publish --stacktrace
+
+      - name: List built artifacts
+        run: ls -lh fabric/build/libs
+
+      # `gh` ships on the runner, so the release needs no third-party action — which
+      # matters here because the repo's action allowlist admits only GitHub-owned
+      # actions plus gradle/actions/*. Uploads every jar, release and sources alike.
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "${{ steps.ver.outputs.title }}" \
+            --generate-notes \
+            fabric/build/libs/*.jar

@@ -46,17 +46,23 @@ subprojects {
 
 
 def getAppVersion = { ->
+    // Release builds are driven by a tag and pass it in explicitly, so the jars and the
+    // Maven coordinates carry the exact tag rather than whatever git happens to report.
+    // See .github/workflows/vibeported.yml.
+    def explicit = System.getenv("MOD_VERSION")
+    if (explicit != null && !explicit.trim().isEmpty()) {
+        return explicit.trim()
+    }
     try {
-        def stdout = new ByteArrayOutputStream()
-        exec {
+        // Gradle 9 removed Project.exec(); providers.exec is the supported replacement.
+        def tag = providers.exec {
             commandLine 'git', 'tag', '--points-at', 'HEAD'
-            standardOutput = stdout
-        }
-        def tag = stdout.toString().trim()
+        }.standardOutput.asText.get().trim()
         if (tag.isEmpty()) {
             return rootProject.minecraft_version + "-SNAPSHOT"
         }
-        return tag
+        // A commit can carry several tags; the first one wins.
+        return tag.split('\\R')[0].trim()
     } catch (Exception e) {
         println "Warning: ${e.message}, is git installed?"
         return rootProject.minecraft_version + "-DEV"
@@ -86,12 +92,16 @@ allprojects {
 
     publishing {
         repositories {
+            // Upstream published to maven.conczin.net; this fork must never write there.
+            // GitHub Packages is scoped to this repository and authenticates with the
+            // workflow's own GITHUB_TOKEN, so there are no long-lived credentials to hold.
             maven {
-                name = "reposiliteRepository"
-                url = uri("https://maven.conczin.net/Artifacts")
+                name = "GitHubPackages"
+                url = uri("https://maven.pkg.github.com/" +
+                        (System.getenv("GITHUB_REPOSITORY") ?: "vibeported-mc/ImmersiveAircraft"))
                 credentials {
-                    username = System.getenv("MAVEN_USERNAME")
-                    password = System.getenv("MAVEN_TOKEN")
+                    username = System.getenv("GITHUB_ACTOR")
+                    password = System.getenv("GITHUB_TOKEN")
                 }
             }
         }

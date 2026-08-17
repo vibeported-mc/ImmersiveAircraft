@@ -75,6 +75,17 @@ tasks.named("assemble") {
     dependsOn tasks.named("shadowJar")
 }
 
+// `jar` and `shadowJar` deliberately write the same path: shadowJar replaces the thin jar
+// in place, because there is no remapJar left to hand the shaded artifact off to. That makes
+// the publication read a file another task produces, which Gradle 9 rejects unless the
+// dependency is explicit, so declare it for everything that consumes the published artifact.
+tasks.withType(GenerateModuleMetadata).configureEach {
+    dependsOn tasks.named("shadowJar")
+}
+tasks.withType(AbstractPublishToMaven).configureEach {
+    dependsOn tasks.named("shadowJar")
+}
+
 sourcesJar {
     def commonSources = project(":common").sourcesJar
     dependsOn commonSources
@@ -92,7 +103,8 @@ publishing {
         mavenCommon(MavenPublication) {
             artifactId = rootProject.archives_base_name
             groupId = rootProject.group_id
-            version = version + "+fabric"
+            // No loader suffix here: release tags already carry `-fabric`, and appending
+            // one would double it. Defaults to project.version, i.e. the tag verbatim.
             from components.java
         }
     }

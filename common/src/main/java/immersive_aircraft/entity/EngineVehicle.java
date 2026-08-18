@@ -23,6 +23,7 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.NotNull;
@@ -281,8 +282,8 @@ public abstract class EngineVehicle extends InventoryVehicleEntity {
                 }
 
                 if (stack.isEmpty()) {
-                    ItemStack remainingItem = item.getCraftingRemainder().create();
-                    getInventory().setItem(slots.get(i).index(), remainingItem);
+                    ItemStackTemplate remainder = item.getCraftingRemainder();
+                    getInventory().setItem(slots.get(i).index(), remainder != null ? remainder.create() : ItemStack.EMPTY);
                 }
             } else {
                 break;
